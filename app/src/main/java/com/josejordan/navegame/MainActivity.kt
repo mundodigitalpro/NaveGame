@@ -37,21 +37,28 @@ class MainActivity : AppCompatActivity() {
 class GameView(context: Context) : View(context) {
     private val paint = Paint()
     private var playerX = 50f // Posición inicial del jugador en X
-    //private var playerY = 50f // Posición inicial del jugador en Y
     private var playerY = 0f // Inicializar playerY a 0
     private val playerSize = 150f
     private val enemies = mutableListOf<RectF>()
     private val enemySize = 50f
     private val enemySpeed = 10f
-
     private var movingDirection = 0 // 0 para quieto, -1 para izquierda, 1 para derecha
     private val playerSpeed = 20f // Velocidad de movimiento del jugador
-
     private var screenHeight = 0 // Variable para almacenar la altura de la pantalla
 
+    private var score = 0
+    private var lives = 3
+
+    private val textPaint = Paint()
+
+    private var lastUpdateTime = System.currentTimeMillis()
 
     init {
         paint.color = Color.BLUE
+        // Configuración inicial del Paint para texto
+        textPaint.color = Color.WHITE
+        textPaint.textSize = 60f
+        textPaint.textAlign = Paint.Align.LEFT
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
@@ -67,6 +74,15 @@ class GameView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
+        // Actualizar y dibujar juego
+        updateGame()
+
+        // Dibujar la puntuación
+        canvas.drawText("Score: $score", 20f, 60f, textPaint)
+
+        // Dibujar las vidas
+        canvas.drawText("Lives: $lives", width - 300f, 60f, textPaint)
+
         // Actualizar la posición del jugador basado en la dirección
         playerX += movingDirection * playerSpeed
         // Asegurarse de que el jugador no salga de la pantalla
@@ -75,22 +91,6 @@ class GameView(context: Context) : View(context) {
 
         // Dibujar al jugador
         canvas.drawRect(playerX, playerY, playerX + playerSize, playerY + playerSize, paint)
-
-        /*// Lista temporal para eliminar enemigos
-        val enemiesToRemove = mutableListOf<RectF>()
-
-        // Dibujar enemigos
-        paint.color = Color.RED
-        for (enemy in enemies) {
-            canvas.drawOval(enemy, paint)
-            enemy.offset(0f, enemySpeed)
-
-            // Eliminar enemigos que salen de la pantalla
-            if (enemy.top > height) {
-                //enemies.remove(enemy)
-                enemiesToRemove.add(enemy)
-            }
-        }*/
 
         // Dibujar enemigos usando un iterator
         val iterator = enemies.iterator()
@@ -119,17 +119,6 @@ class GameView(context: Context) : View(context) {
         invalidate()
     }
 
-/*    override fun onTouchEvent(event: MotionEvent): Boolean {
-        when (event.action) {
-            MotionEvent.ACTION_DOWN -> {
-                // Actualizar la posición del jugador
-                playerX = event.x - playerSize / 2
-                playerY = event.y - playerSize / 2
-            }
-        }
-        return true
-    }*/
-
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.action) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
@@ -147,18 +136,36 @@ class GameView(context: Context) : View(context) {
         return true
     }
 
+    private fun updateGame() {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastUpdateTime > 1000) { // Incrementar el score cada segundo
+            score++
+            lastUpdateTime = currentTime
+        }
+    }
+
     private fun checkCollision() {
         val playerRect = RectF(playerX, playerY, playerX + playerSize, playerY + playerSize)
-        for (enemy in enemies) {
+        val iterator = enemies.iterator()
+        while (iterator.hasNext()) {
+            val enemy = iterator.next()
             if (RectF.intersects(playerRect, enemy)) {
-                // Colisión detectada, manejar lógica de fin del juego o vida perdida
-                resetGame()
-                break
+                lives--
+                iterator.remove() // Eliminar usando el iterator
+                if (lives <= 0) {
+                    resetGame()
+                    return // Importante para detener la ejecución adicional en este punto
+                }
             }
         }
     }
 
     private fun resetGame() {
+
+        // Reiniciar el juego
+        score = 0
+        lives = 3
+
         // Reiniciar la posición del jugador a la parte inferior de la pantalla
         playerX = 50f // O la posición X deseada
         playerY = screenHeight - playerSize
@@ -167,4 +174,3 @@ class GameView(context: Context) : View(context) {
         enemies.clear()
     }
 }
-
