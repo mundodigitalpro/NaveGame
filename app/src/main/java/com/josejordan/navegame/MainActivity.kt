@@ -52,6 +52,9 @@ class GameView(context: Context) : View(context) {
         // Dibujar al jugador
         canvas.drawRect(playerX, playerY, playerX + playerSize, playerY + playerSize, paint)
 
+        /*// Lista temporal para eliminar enemigos
+        val enemiesToRemove = mutableListOf<RectF>()
+
         // Dibujar enemigos
         paint.color = Color.RED
         for (enemy in enemies) {
@@ -60,7 +63,22 @@ class GameView(context: Context) : View(context) {
 
             // Eliminar enemigos que salen de la pantalla
             if (enemy.top > height) {
-                enemies.remove(enemy)
+                //enemies.remove(enemy)
+                enemiesToRemove.add(enemy)
+            }
+        }*/
+
+        // Dibujar enemigos usando un iterator
+        val iterator = enemies.iterator()
+        paint.color = Color.RED
+        while (iterator.hasNext()) {
+            val enemy = iterator.next()
+            canvas.drawOval(enemy, paint)
+            enemy.offset(0f, enemySpeed)
+
+            // Eliminar enemigos que salen de la pantalla
+            if (enemy.top > height) {
+                iterator.remove() // Eliminar usando el iterator
             }
         }
 
