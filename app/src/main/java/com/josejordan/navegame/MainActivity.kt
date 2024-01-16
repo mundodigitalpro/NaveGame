@@ -53,6 +53,8 @@ class GameView(context: Context) : View(context) {
 
     private var lastUpdateTime = System.currentTimeMillis()
 
+    private var isGameOver = false
+
     init {
         paint.color = Color.BLUE
         // Configuración inicial del Paint para texto
@@ -74,11 +76,21 @@ class GameView(context: Context) : View(context) {
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
+        if (isGameOver) {
+            // Mostrar mensaje GAME OVER
+            textPaint.textAlign = Paint.Align.CENTER  // Asegurarse de que el texto esté centrado
+            canvas.drawText("GAME OVER", width / 2f, height / 2f, textPaint)
+
+            // Opcional: Detener el juego por unos segundos antes de reiniciar
+            postDelayed({ resetGame() }, 3000) // 3000ms = 3 segundos
+            return
+        }
+
         // Actualizar y dibujar juego
         updateGame()
 
         // Dibujar la puntuación
-        canvas.drawText("Score: $score", 20f, 60f, textPaint)
+        canvas.drawText("Score: $score", 50f, 60f, textPaint)
 
         // Dibujar las vidas
         canvas.drawText("Lives: $lives", width - 300f, 60f, textPaint)
@@ -128,6 +140,7 @@ class GameView(context: Context) : View(context) {
                     else -> 0
                 }
             }
+
             MotionEvent.ACTION_UP -> {
                 // Detener el movimiento cuando el usuario levanta el dedo
                 movingDirection = 0
@@ -153,7 +166,8 @@ class GameView(context: Context) : View(context) {
                 lives--
                 iterator.remove() // Eliminar usando el iterator
                 if (lives <= 0) {
-                    resetGame()
+                    isGameOver = true
+                    postDelayed({ resetGame() }, 3000) // Retrasar la llamada a resetGame()
                     return // Importante para detener la ejecución adicional en este punto
                 }
             }
@@ -172,5 +186,8 @@ class GameView(context: Context) : View(context) {
 
         // Limpiar la lista de enemigos
         enemies.clear()
+
+        isGameOver = false
+        invalidate() // Para forzar un redibujado y volver al bucle de juego normal
     }
 }
