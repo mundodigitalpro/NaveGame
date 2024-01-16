@@ -90,7 +90,7 @@ class GameView(context: Context) : View(context) {
         updateGame()
 
         // Dibujar la puntuación
-        canvas.drawText("Score: $score", 50f, 60f, textPaint)
+        canvas.drawText("Score: $score", 20f, 60f, textPaint)
 
         // Dibujar las vidas
         canvas.drawText("Lives: $lives", width - 300f, 60f, textPaint)
@@ -188,6 +188,10 @@ class GameView(context: Context) : View(context) {
         enemies.clear()
 
         isGameOver = false
+
+        textPaint.textAlign = Paint.Align.LEFT
+        textPaint.textSize = 60f
+
         invalidate() // Para forzar un redibujado y volver al bucle de juego normal
     }
 }
