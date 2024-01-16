@@ -36,96 +36,68 @@ class MainActivity : AppCompatActivity() {
 
 class GameView(context: Context) : View(context) {
     private val paint = Paint()
-    private var playerX = 50f // Posición inicial del jugador en X
-    private var playerY = 0f // Inicializar playerY a 0
-    private val playerSize = 150f
-    private val enemies = mutableListOf<RectF>()
-    private val enemySize = 50f
-    private val enemySpeed = 10f
-    private var movingDirection = 0 // 0 para quieto, -1 para izquierda, 1 para derecha
-    private val playerSpeed = 20f // Velocidad de movimiento del jugador
-    private var screenHeight = 0 // Variable para almacenar la altura de la pantalla
-
-    private var score = 0
-    private var lives = 3
-
-    private val textPaint = Paint()
-
-    private var lastUpdateTime = System.currentTimeMillis()
-
-    private var isGameOver = false
-
-    init {
-        paint.color = Color.BLUE
-        // Configuración inicial del Paint para texto
-        textPaint.color = Color.WHITE
-        textPaint.textSize = 60f
-        textPaint.textAlign = Paint.Align.LEFT
+    private var screenWidth = 0
+    private var screenHeight = 0
+    private lateinit var gameManager: GameManager
+    private var movingDirection = 0f // Dirección del movimiento del jugador
+    private val textPaint = Paint().apply {
+        color = Color.WHITE
+        textSize = 60f
+        textAlign = Paint.Align.LEFT
     }
 
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
-
-        // Almacenar la altura de la pantalla
+        screenWidth = w
         screenHeight = h
-
-        // Establecer la posición inicial del jugador en la parte inferior de la pantalla
-        playerY = screenHeight - playerSize
+        gameManager = GameManager(screenWidth, screenHeight)
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
 
-        if (isGameOver) {
-            // Mostrar mensaje GAME OVER
-            textPaint.textAlign = Paint.Align.CENTER  // Asegurarse de que el texto esté centrado
-            canvas.drawText("GAME OVER", width / 2f, height / 2f, textPaint)
-
-            // Opcional: Detener el juego por unos segundos antes de reiniciar
-            postDelayed({ resetGame() }, 3000) // 3000ms = 3 segundos
+        if (gameManager.isGameOver) {
+            textPaint.textAlign = Paint.Align.CENTER
+            canvas.drawText("GAME OVER", screenWidth / 2f, screenHeight / 2f, textPaint)
+            postDelayed({ resetGame() }, 3000)
             return
         }
+        // Actualizar la posición del jugador
+        if (movingDirection != 0f) {
+            gameManager.playerX += movingDirection
+            gameManager.playerX = max(
+                0f,
+                min(gameManager.playerX, screenWidth - 150f)
+            ) // Asegurar que el jugador no salga de la pantalla
+        }
 
-        // Actualizar y dibujar juego
-        updateGame()
+        // Actualizar y verificar el juego
+        gameManager.updateGame()
+        gameManager.addEnemy()
+        gameManager.checkCollision()
 
         // Dibujar la puntuación
-        canvas.drawText("Score: $score", 20f, 60f, textPaint)
+        canvas.drawText("Score: ${gameManager.score}", 50f, 60f, textPaint)
 
         // Dibujar las vidas
-        canvas.drawText("Lives: $lives", width - 300f, 60f, textPaint)
-
-        // Actualizar la posición del jugador basado en la dirección
-        playerX += movingDirection * playerSpeed
-        // Asegurarse de que el jugador no salga de la pantalla
-        playerX = max(0f, min(playerX, width - playerSize))
-
+        canvas.drawText("Lives: ${gameManager.lives}", screenWidth - 300f, 60f, textPaint)
 
         // Dibujar al jugador
-        canvas.drawRect(playerX, playerY, playerX + playerSize, playerY + playerSize, paint)
+        paint.color = Color.BLUE
+        canvas.drawRect(
+            gameManager.playerX,
+            gameManager.playerY,
+            gameManager.playerX + 150f,
+            gameManager.playerY + 150f,
+            paint
+        )
 
-        // Dibujar enemigos usando un iterator
-        val iterator = enemies.iterator()
+        // Dibujar enemigos
+        gameManager.updateEnemies()
         paint.color = Color.RED
-        while (iterator.hasNext()) {
-            val enemy = iterator.next()
-            canvas.drawOval(enemy, paint)
-            enemy.offset(0f, enemySpeed)
-
-            // Eliminar enemigos que salen de la pantalla
-            if (enemy.top > height) {
-                iterator.remove() // Eliminar usando el iterator
-            }
+        for (enemy in gameManager.enemies) {
+            canvas.drawOval(enemy, paint) // Asegúrate de que los enemigos se dibujen correctamente
         }
-
-        // Agregar un nuevo enemigo ocasionalmente
-        if (Random.nextInt(100) < 5) {
-            val x = Random.nextFloat() * (width - enemySize)
-            enemies.add(RectF(x, -enemySize, x + enemySize, 0f))
-        }
-
-        // Verificar colisiones
-        checkCollision()
 
         // Redibujar
         invalidate()
@@ -134,64 +106,86 @@ class GameView(context: Context) : View(context) {
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.action) {
             MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE -> {
-                movingDirection = when {
-                    event.x < playerX + playerSize / 2 -> -1 // Mover a la izquierda
-                    event.x > playerX + playerSize / 2 -> 1  // Mover a la derecha
-                    else -> 0
-                }
+                movingDirection = if (event.x < screenWidth / 2) -10f else 10f // Actualizar la dirección del movimiento
             }
-
             MotionEvent.ACTION_UP -> {
-                // Detener el movimiento cuando el usuario levanta el dedo
-                movingDirection = 0
+                movingDirection = 0f // Detener el movimiento cuando se levanta el dedo
             }
         }
         return true
     }
 
-    private fun updateGame() {
+    private fun resetGame() {
+        // Reiniciar el juego usando GameManager
+        gameManager = GameManager(screenWidth, screenHeight)
+        invalidate()
+    }
+}
+
+class GameManager(private val screenWidth: Int, private val screenHeight: Int) {
+    var score = 0
+    var lives = 3
+    var isGameOver = false
+
+    private val playerSize = 150f
+    private val enemySize = 50f
+    private val enemySpeed = 10f
+    var playerX = 50f
+    var playerY = screenHeight - playerSize
+    val enemies = mutableListOf<RectF>()
+
+    private var lastUpdateTime = System.currentTimeMillis()
+
+    fun updateGame() {
         val currentTime = System.currentTimeMillis()
-        if (currentTime - lastUpdateTime > 1000) { // Incrementar el score cada segundo
+        if (currentTime - lastUpdateTime > 1000) {
             score++
             lastUpdateTime = currentTime
         }
     }
 
-    private fun checkCollision() {
+    fun checkCollision() {
         val playerRect = RectF(playerX, playerY, playerX + playerSize, playerY + playerSize)
         val iterator = enemies.iterator()
         while (iterator.hasNext()) {
             val enemy = iterator.next()
             if (RectF.intersects(playerRect, enemy)) {
                 lives--
-                iterator.remove() // Eliminar usando el iterator
+                iterator.remove()
                 if (lives <= 0) {
                     isGameOver = true
-                    postDelayed({ resetGame() }, 3000) // Retrasar la llamada a resetGame()
-                    return // Importante para detener la ejecución adicional en este punto
+                    return
                 }
             }
         }
     }
 
-    private fun resetGame() {
+    // Método para agregar nuevos enemigos
 
-        // Reiniciar el juego
-        score = 0
-        lives = 3
+    fun addEnemy() {
+        if (Random.nextInt(100) < 5) { // 5% de posibilidad de añadir un nuevo enemigo
+            val x = Random.nextFloat() * (screenWidth - enemySize)
+            enemies.add(
+                RectF(
+                    x,
+                    -enemySize,
+                    x + enemySize,
+                    0f
+                )
+            )
+        }
+    }
 
-        // Reiniciar la posición del jugador a la parte inferior de la pantalla
-        playerX = 50f // O la posición X deseada
-        playerY = screenHeight - playerSize
+    // Método para actualizar la posición de los enemigos
+    fun updateEnemies() {
+        val iterator = enemies.iterator()
+        while (iterator.hasNext()) {
+            val enemy = iterator.next()
+            enemy.offset(0f, enemySpeed) // Mover el enemigo hacia abajo
 
-        // Limpiar la lista de enemigos
-        enemies.clear()
-
-        isGameOver = false
-
-        textPaint.textAlign = Paint.Align.LEFT
-        textPaint.textSize = 60f
-
-        invalidate() // Para forzar un redibujado y volver al bucle de juego normal
+            if (enemy.top > screenHeight) {
+                iterator.remove() // Eliminar enemigos que salen de la pantalla
+            }
+        }
     }
 }
